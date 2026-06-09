@@ -1,0 +1,54 @@
+# Frontend
+frontend/node_modules/
+frontend/.env.local
+frontend/.env.*.local
+frontend/dist/
+frontend/build/
+frontend/.DS_Store
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# Backend
+backend/target/
+backend/.classpath
+backend/.project
+backend/.settings/
+backend/.vscode/
+backend/bin/
+backend/.idea/
+backend/*.iml
+backend/*.jks
+backend/application-*.yml
+backend/application-*.properties
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build
+*.class
+*.log
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore

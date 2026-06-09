@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: autowash-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: autowash
+      MYSQL_USER: autowash_user
+      MYSQL_PASSWORD: autowash_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/data.sql:/docker-entrypoint-initdb.d/02-data.sql
+    networks:
+      - autowash-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Spring Boot Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: autowash-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/autowash?useSSL=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: autowash_user
+      SPRING_DATASOURCE_PASSWORD: autowash_pass
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - autowash-network
+    restart: unless-stopped
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: autowash-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8080/api
+    depends_on:
+      - backend
+    networks:
+      - autowash-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  autowash-network:
+    driver: bridge
