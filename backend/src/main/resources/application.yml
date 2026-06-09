@@ -3,17 +3,17 @@ spring:
     name: AutoWash Backend
   
   datasource:
-    url: jdbc:mysql://localhost:3306/autowash?useSSL=false&serverTimezone=UTC
-    username: root
-    password: 
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:sqlserver://localhost:1433;databaseName=AutoWash;encrypt=true;trustServerCertificate=true
+    username: sa
+    password: YourPassword123!
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
   
   jpa:
     hibernate:
       ddl-auto: validate
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.MySQL8Dialect
+        dialect: org.hibernate.dialect.SQLServer2012Dialect
         format_sql: true
     show-sql: false
   

@@ -1,25 +1,24 @@
 version: '3.8'
 
 services:
-  # MySQL Database
-  mysql:
-    image: mysql:8.0
-    container_name: autowash-mysql
+  # SQL Server Database
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: autowash-sqlserver
     environment:
-      MYSQL_ROOT_PASSWORD: root123
-      MYSQL_DATABASE: autowash
-      MYSQL_USER: autowash_user
-      MYSQL_PASSWORD: autowash_pass
+      ACCEPT_EULA: 'Y'
+      SA_PASSWORD: 'YourPassword123!'
+      MSSQL_PID: Express
     ports:
-      - "3306:3306"
+      - "1433:1433"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - sqlserver_data:/var/opt/mssql
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
       - ./database/data.sql:/docker-entrypoint-initdb.d/02-data.sql
     networks:
       - autowash-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "YourPassword123!", "-Q", "SELECT 1"]
       timeout: 20s
       retries: 10
 
@@ -30,13 +29,13 @@ services:
       dockerfile: Dockerfile
     container_name: autowash-backend
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/autowash?useSSL=false&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: autowash_user
-      SPRING_DATASOURCE_PASSWORD: autowash_pass
+      SPRING_DATASOURCE_URL: jdbc:sqlserver://sqlserver:1433;databaseName=AutoWash;encrypt=true;trustServerCertificate=true
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: YourPassword123!
     ports:
       - "8080:8080"
     depends_on:
-      mysql:
+      sqlserver:
         condition: service_healthy
     networks:
       - autowash-network
@@ -59,7 +58,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  mysql_data:
+  sqlserver_data:
 
 networks:
   autowash-network:

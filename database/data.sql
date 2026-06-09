@@ -1,6 +1,7 @@
--- Sample Data for AutoWash Database
+-- Sample Data for AutoWash Database (SQL Server)
 
-USE autowash;
+USE AutoWash;
+GO
 
 -- Insert sample users
 INSERT INTO users (username, email, password, first_name, last_name, phone, address, role) VALUES
@@ -17,10 +18,11 @@ INSERT INTO services (name, description, price, duration_minutes) VALUES
 
 -- Insert sample bookings
 INSERT INTO bookings (user_id, service_id, booking_date, status, notes) VALUES
-(2, 1, DATE_ADD(NOW(), INTERVAL 1 DAY), 'CONFIRMED', 'Please be gentle with the paint'),
-(2, 2, DATE_ADD(NOW(), INTERVAL 2 DAY), 'PENDING', '');
+(2, 1, DATEADD(DAY, 1, GETDATE()), 'CONFIRMED', 'Please be gentle with the paint'),
+(2, 2, DATEADD(DAY, 2, GETDATE()), 'PENDING', '');
 
 -- Insert sample payments
 INSERT INTO payments (booking_id, amount, payment_method, status) VALUES
 (1, 50000, 'CASH', 'PENDING'),
 (2, 100000, 'CARD', 'PENDING');
+GO
