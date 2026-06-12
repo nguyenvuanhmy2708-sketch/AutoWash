@@ -5,7 +5,7 @@ spring:
   datasource:
     url: jdbc:sqlserver://localhost:1433;databaseName=AutoWash;encrypt=true;trustServerCertificate=true
     username: sa
-    password: YourPassword123!
+    password: 12345
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
   
   jpa:
@@ -30,7 +30,7 @@ server:
     context-path: /api
 
 jwt:
-  secret: your-secret-key-change-this-in-production
+  secret: autowash-super-secret-key-for-demo-project-2026
   expiration: 86400000
 
 logging:
