@@ -4,6 +4,8 @@ import com.autowash.dto.LoginRequest;
 import com.autowash.dto.LoginResponse;
 import com.autowash.dto.RegisterRequest;
 import com.autowash.dto.RegisterResponse;
+import com.autowash.dto.ForgotPasswordRequest;
+import com.autowash.dto.ResetPasswordRequest;
 import com.autowash.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -30,5 +32,17 @@ public class AuthController {
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
         LoginResponse response = authService.login(request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok().build();
     }
 }

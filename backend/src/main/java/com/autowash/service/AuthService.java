@@ -19,6 +19,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
+import com.autowash.dto.ForgotPasswordRequest;
+import com.autowash.dto.ResetPasswordRequest;
+import com.autowash.entity.PasswordResetToken;
+import com.autowash.repository.PasswordResetTokenRepository;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 import java.math.BigDecimal;
 
@@ -31,6 +38,11 @@ public class AuthService {
     private final LoyaltyProfileRepository loyaltyProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final PasswordResetTokenRepository tokenRepository;
+    private final EmailService emailService;
+
+    @Value("${app.frontend-url:http://localhost:5173}")
+    private String frontendUrl;
 
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
@@ -119,5 +131,57 @@ public class AuthService {
                 .fullName(user.getFullName())
                 .role(user.getRole())
                 .build();
+    }
+
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
+            throw new AppException("Email is required", HttpStatus.BAD_REQUEST);
+        }
+
+        User user = userRepository.findByEmail(request.getEmail().trim())
+                .orElseThrow(() -> new AppException("Email is not registered", HttpStatus.NOT_FOUND));
+
+        // Delete existing tokens for this user
+        tokenRepository.deleteByUser(user);
+
+        // Generate token
+        String token = UUID.randomUUID().toString();
+        PasswordResetToken resetToken = PasswordResetToken.builder()
+                .token(token)
+                .user(user)
+                .expiryDate(LocalDateTime.now().plusMinutes(15))
+                .build();
+
+        tokenRepository.save(resetToken);
+
+        // Send email
+        String resetLink = frontendUrl + "/reset-password?token=" + token;
+        emailService.sendResetPasswordEmail(user.getEmail(), resetLink);
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        if (request.getToken() == null || request.getToken().trim().isEmpty()) {
+            throw new AppException("Token is required", HttpStatus.BAD_REQUEST);
+        }
+        if (request.getNewPassword() == null || request.getNewPassword().trim().isEmpty()) {
+            throw new AppException("Password is required", HttpStatus.BAD_REQUEST);
+        }
+
+        PasswordResetToken resetToken = tokenRepository.findByToken(request.getToken().trim())
+                .orElseThrow(() -> new AppException("Invalid or expired password reset token", HttpStatus.BAD_REQUEST));
+
+        if (resetToken.isExpired()) {
+            tokenRepository.delete(resetToken);
+            throw new AppException("Password reset token has expired", HttpStatus.BAD_REQUEST);
+        }
+
+        User user = resetToken.getUser();
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        // Clean up token
+        tokenRepository.delete(resetToken);
     }
 }

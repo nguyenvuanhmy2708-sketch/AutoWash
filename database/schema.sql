@@ -261,3 +261,14 @@ CREATE TABLE LoyaltyProfiles (
         )
 );
 GO
+
+CREATE TABLE PasswordResetTokens (
+    token_id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    user_id BIGINT NOT NULL,
+    expiry_date DATETIME2 NOT NULL,
+    created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+    
+    CONSTRAINT FK_PasswordResetTokens_Users FOREIGN KEY (user_id) REFERENCES Users(user_id)
+);
+GO

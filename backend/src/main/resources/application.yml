@@ -11,6 +11,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
     properties:
       hibernate:
         dialect: org.hibernate.dialect.SQLServer2012Dialect
@@ -23,6 +25,18 @@ spring:
       allowed-methods: GET, POST, PUT, DELETE, OPTIONS
       allowed-headers: '*'
       allow-credentials: true
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:your-email@gmail.com}
+    password: ${MAIL_PASSWORD:your-app-password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 server:
   port: 8080
@@ -37,4 +51,7 @@ logging:
   level:
     root: INFO
     com.autowash: DEBUG
+
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
 
