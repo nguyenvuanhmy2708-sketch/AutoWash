@@ -26,6 +26,7 @@ public class BookingService {
     private final UserRepository userRepository;
     private final ServicePackageRepository servicePackageRepository;
     private final TimeSlotRepository timeSlotRepository;
+    private final NotificationService notificationService;
 
     public List<Booking> getAllBookings() {
         return bookingRepository.findAll();
@@ -58,6 +59,14 @@ public class BookingService {
             throw new AppException("Invalid vehicle size", HttpStatus.BAD_REQUEST);
         }
 
+        // Capacity check
+        long activeBookingsCount = bookingRepository.countByTimeSlotSlotIdAndBookingDateAndBookingStatusNot(
+                slotId, bookingDate, BookingStatus.CANCELLED
+        );
+        if (activeBookingsCount >= timeSlot.getCapacity()) {
+            throw new AppException("This time slot is fully booked for the selected date", HttpStatus.BAD_REQUEST);
+        }
+
         Booking booking = Booking.builder()
                 .user(user)
                 .servicePackage(servicePackage)
@@ -68,7 +77,19 @@ public class BookingService {
                 .bookingStatus(BookingStatus.CONFIRMED)
                 .build();
 
-        return bookingRepository.save(booking);
+        booking = bookingRepository.save(booking);
+
+        // Notify
+        notificationService.createNotification(
+                user,
+                "Booking Created",
+                String.format("Đặt lịch thành công cho gói dịch vụ %s vào ngày %s khung giờ %s.", 
+                        servicePackage.getPackageName(), 
+                        bookingDate, 
+                        timeSlot.getStartTime() + " - " + timeSlot.getEndTime())
+        );
+
+        return booking;
     }
 
     @Transactional
@@ -83,7 +104,24 @@ public class BookingService {
             throw new AppException("Invalid booking status", HttpStatus.BAD_REQUEST);
         }
 
+        BookingStatus oldStatus = booking.getBookingStatus();
         booking.setBookingStatus(status);
-        return bookingRepository.save(booking);
+        Booking updatedBooking = bookingRepository.save(booking);
+
+        if (status == BookingStatus.CANCELLED && oldStatus != BookingStatus.CANCELLED) {
+            notificationService.createNotification(
+                    booking.getUser(),
+                    "Booking Cancelled",
+                    String.format("Lượt đặt lịch ngày %s đã bị hủy thành công.", booking.getBookingDate())
+            );
+        } else if (status == BookingStatus.COMPLETED && oldStatus != BookingStatus.COMPLETED) {
+            notificationService.createNotification(
+                    booking.getUser(),
+                    "Booking Completed",
+                    String.format("Lượt rửa xe ngày %s đã hoàn thành. Cảm ơn quý khách!", booking.getBookingDate())
+            );
+        }
+
+        return updatedBooking;
     }
 }
