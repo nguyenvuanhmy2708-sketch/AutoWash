@@ -67,6 +67,22 @@ public class BookingService {
             throw new AppException("This time slot is fully booked for the selected date", HttpStatus.BAD_REQUEST);
         }
 
+        // User daily booking limit check (at most 3 bookings per day)
+        long userBookingsCount = bookingRepository.countByUserUserIdAndBookingDateAndBookingStatusNot(
+                userId, bookingDate, BookingStatus.CANCELLED
+        );
+        if (userBookingsCount >= 3) {
+            throw new AppException("You can only book at most 3 times per day", HttpStatus.BAD_REQUEST);
+        }
+
+        // Each slot can only be booked once per day per user (excluding CANCELLED bookings)
+        boolean alreadyBookedSlot = bookingRepository.existsByUserUserIdAndTimeSlotSlotIdAndBookingDateAndBookingStatusNot(
+                userId, slotId, bookingDate, BookingStatus.CANCELLED
+        );
+        if (alreadyBookedSlot) {
+            throw new AppException("You have already booked this time slot for the selected date", HttpStatus.BAD_REQUEST);
+        }
+
         Booking booking = Booking.builder()
                 .user(user)
                 .servicePackage(servicePackage)
