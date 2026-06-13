@@ -1,0 +1,7 @@
+# Use this workspace to collaborate
+workspace:
+  id: b20d986b-43c7-4339-89ac-1f2c0a505ac3
+
+localResources:
+  collections:
+    - ..\AutoWash.postman_collection.json
