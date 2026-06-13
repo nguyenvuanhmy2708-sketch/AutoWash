@@ -5,12 +5,14 @@ spring:
   datasource:
     url: jdbc:sqlserver://localhost:1433;databaseName=AutoWash;encrypt=true;trustServerCertificate=true
     username: sa
-    password: YourPassword123!
+    password: 12345
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
   
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
     properties:
       hibernate:
         dialect: org.hibernate.dialect.SQLServer2012Dialect
@@ -24,16 +26,32 @@ spring:
       allowed-headers: '*'
       allow-credentials: true
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:your-email@gmail.com}
+    password: ${MAIL_PASSWORD:your-app-password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
 server:
   port: 8080
   servlet:
     context-path: /api
 
 jwt:
-  secret: your-secret-key-change-this-in-production
+  secret: autowash-super-secret-key-for-demo-project-2026
   expiration: 86400000
 
 logging:
   level:
     root: INFO
     com.autowash: DEBUG
+
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+
