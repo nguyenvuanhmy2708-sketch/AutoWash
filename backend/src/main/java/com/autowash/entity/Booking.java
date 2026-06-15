@@ -4,6 +4,7 @@ import com.autowash.enums.BookingStatus;
 import com.autowash.enums.VehicleSize;
 import jakarta.persistence.*;
 import lombok.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.math.BigDecimal;

@@ -140,4 +140,17 @@ public class BookingService {
 
         return updatedBooking;
     }
+    @Transactional
+    public void cancelBookingByUserSlotAndPackage(Long userId, Long slotId, Long packageId) {
+        // 1. Tìm đơn đặt lịch thỏa mãn cả 3 điều kiện và phải đang ở trạng thái CONFIRMED
+        Booking booking = bookingRepository.findByUserUserIdAndTimeSlotSlotIdAndServicePackagePackageIdAndBookingStatus(
+                        userId, slotId, packageId, BookingStatus.CONFIRMED)
+                .orElseThrow(() -> new AppException("Không tìm thấy đơn đặt lịch nào phù hợp hoặc đơn hàng đã bị xử lý trước đó", HttpStatus.NOT_FOUND));
+
+        // 2. Chuyển trạng thái đơn hàng sang CANCELLED
+        booking.setBookingStatus(BookingStatus.CANCELLED);
+
+        // 3. Lưu lại vào database
+        bookingRepository.save(booking);
+    }
 }
