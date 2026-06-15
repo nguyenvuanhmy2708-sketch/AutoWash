@@ -58,4 +58,19 @@ public class BookingController {
         private LocalDate bookingDate;
         private String vehicleSize;
     }
+    @PutMapping("/cancel")
+    public ResponseEntity<java.util.Map<String, String>> cancelBooking(
+            @RequestParam Long userId,
+            @RequestParam Long slotId,
+            @RequestParam Long packageId) {
+
+        // Gọi xuống service xử lý logic hủy và lưu DB
+        bookingService.cancelBookingByUserSlotAndPackage(userId, slotId, packageId);
+
+        // Tạo chuỗi JSON thông báo thành công gọn nhẹ để trả về, tránh trả nguyên Entity bị đơ LAZY
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        response.put("message", "Hủy đơn đặt lịch thành công!");
+
+        return ResponseEntity.ok(response);
+    }
 }

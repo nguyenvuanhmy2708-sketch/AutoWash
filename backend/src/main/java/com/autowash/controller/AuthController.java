@@ -1,5 +1,6 @@
 package com.autowash.controller;
 
+import java.util.Map;
 import com.autowash.dto.LoginRequest;
 import com.autowash.dto.LoginResponse;
 import com.autowash.dto.RegisterRequest;
@@ -44,5 +45,11 @@ public class AuthController {
     public ResponseEntity<Void> resetPassword(@RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request);
         return ResponseEntity.ok().build();
+    }
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, String>> logout() {
+        Map<String, String> response = new java.util.HashMap<>();
+        response.put("message", "Đăng xuất thành công");
+        return ResponseEntity.ok(response);
     }
 }
