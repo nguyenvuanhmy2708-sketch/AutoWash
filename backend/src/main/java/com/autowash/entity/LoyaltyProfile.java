@@ -3,20 +3,10 @@ package com.autowash.entity;
 import com.autowash.enums.Tier;
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.LocalDateTime;
 
 @Entity
-@Table(
-        name = "LoyaltyProfiles",
-        schema = "dbo",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "UQ_LoyaltyProfiles_User",
-                        columnNames = "user_id"
-                )
-        }
-)
+@Table(name = "LoyaltyProfiles", schema = "dbo")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -30,11 +20,7 @@ public class LoyaltyProfile {
     private Long loyaltyId;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(
-            name = "user_id",
-            nullable = false,
-            foreignKey = @ForeignKey(name = "FK_LoyaltyProfiles_Users")
-    )
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @Column(name = "total_points", nullable = false)
@@ -55,12 +41,8 @@ public class LoyaltyProfile {
         LocalDateTime now = LocalDateTime.now();
         createdAt = now;
         updatedAt = now;
-        if (totalPoints == null) {
-            totalPoints = 0;
-        }
-        if (currentTier == null) {
-            currentTier = Tier.BRONZE;
-        }
+        if (totalPoints == null) totalPoints = 0;
+        if (currentTier == null) currentTier = Tier.BRONZE;
     }
 
     @PreUpdate

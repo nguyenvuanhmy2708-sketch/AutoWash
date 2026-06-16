@@ -1,7 +1,24 @@
 ﻿USE AutoWash;
 GO
 
--- 1. XÓA BẢNG CŨ (Nếu đã tồn tại) - Phải xóa theo đúng thứ tự khóa ngoại
+-- =========================================================================
+-- 🟢 BƯỚC 1: TUYỆT CHIÊU TỰ ĐỘNG TÌM VÀ XÓA TẤT CẢ KHÓA NGOẠI (KHÔNG CẦN BIẾT TÊN)
+-- =========================================================================
+DECLARE @Sql NVARCHAR(MAX) = N'';
+
+SELECT @Sql += 'ALTER TABLE [' + OBJECT_SCHEMA_NAME(parent_object_id) + '].[' + OBJECT_NAME(parent_object_id) + '] DROP CONSTRAINT [' + name + '];' + CHAR(13)
+FROM sys.foreign_keys;
+
+IF LEN(@Sql) > 0
+BEGIN
+    EXEC sp_executesql @Sql;
+END
+GO
+
+-- =========================================================================
+-- 🟢 BƯỚC 2: DROP TOÀN BỘ CÁC BẢNG CŨ (BÂY GIỜ CHẮC CHẮN TRỐNG KHÓA NGOẠI)
+-- =========================================================================
+DROP TABLE IF EXISTS Notifications;
 DROP TABLE IF EXISTS PasswordResetTokens;
 DROP TABLE IF EXISTS LoyaltyProfiles;
 DROP TABLE IF EXISTS Payments;
@@ -13,7 +30,9 @@ DROP TABLE IF EXISTS ServicePackages;
 DROP TABLE IF EXISTS Users;
 GO
 
--- 2. TẠO LẠI CÁC BẢNG MỚI
+-- =========================================================================
+-- 🟢 BƯỚC 3: TẠO MỚI TOÀN BỘ CẤU TRÚC DATABASE SẠCH SẼ
+-- =========================================================================
 CREATE TABLE Users (
     user_id BIGINT IDENTITY(1,1) PRIMARY KEY,
     full_name NVARCHAR(100) NOT NULL,
@@ -34,7 +53,7 @@ CREATE TABLE ServicePackages (
     package_id BIGINT IDENTITY(1,1) PRIMARY KEY,
     package_code VARCHAR(20) NOT NULL,
     package_name NVARCHAR(100) NOT NULL,
-    price DECIMAL(12,0) NOT NULL,
+    price DECIMAL(18,2) NOT NULL,
     description NVARCHAR(MAX) NULL,
     is_active BIT NOT NULL DEFAULT 1,
     created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
@@ -64,7 +83,7 @@ CREATE TABLE Bookings (
     booking_date DATE NOT NULL,
     vehicle_size VARCHAR(20) NOT NULL,
     booking_status VARCHAR(20) NOT NULL,
-    total_amount DECIMAL(12,0) NOT NULL,
+    total_amount DECIMAL(18,2) NOT NULL,
     created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
     updated_at DATETIME2 NOT NULL DEFAULT GETDATE(),
     CONSTRAINT FK_Bookings_Users FOREIGN KEY (user_id) REFERENCES Users(user_id),
@@ -78,7 +97,7 @@ GO
 CREATE TABLE Wallets (
     wallet_id BIGINT IDENTITY(1,1) PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    balance DECIMAL(12,0) NOT NULL DEFAULT 0,
+    balance DECIMAL(18,2) NOT NULL DEFAULT 0,
     created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
     updated_at DATETIME2 NOT NULL DEFAULT GETDATE(),
     CONSTRAINT UQ_Wallets_User UNIQUE (user_id),
@@ -91,7 +110,7 @@ CREATE TABLE WalletTransactions (
     transaction_id BIGINT IDENTITY(1,1) PRIMARY KEY,
     wallet_id BIGINT NOT NULL,
     booking_id BIGINT NULL,
-    amount DECIMAL(12,0) NOT NULL,
+    amount DECIMAL(18,2) NOT NULL,
     transaction_type VARCHAR(20) NOT NULL,
     description NVARCHAR(255) NULL,
     created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
@@ -104,7 +123,7 @@ GO
 CREATE TABLE Payments (
     payment_id BIGINT IDENTITY(1,1) PRIMARY KEY,
     booking_id BIGINT NOT NULL,
-    amount DECIMAL(12,0) NOT NULL,
+    amount DECIMAL(18,2) NOT NULL,
     payment_method VARCHAR(20) NOT NULL,
     payment_status VARCHAR(20) NOT NULL,
     transaction_reference VARCHAR(255) NULL,
@@ -149,7 +168,10 @@ CREATE TABLE Notifications (
     message NVARCHAR(MAX) NOT NULL,
     is_read BIT NOT NULL DEFAULT 0,
     created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
-    
     CONSTRAINT FK_Notifications_Users FOREIGN KEY (user_id) REFERENCES Users(user_id)
 );
+GO
+
+-- ❌ ĐÃ GỠ BỎ HOÀN TOÀN TRIGGER CŨ ĐỂ NHƯỜNG LUỒNG XỬ LÝ AN TOÀN CHO CODE JAVA
+DROP TRIGGER IF EXISTS trg_CalculateBookingDiscount;
 GO

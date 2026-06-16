@@ -5,6 +5,7 @@ import com.autowash.entity.ServicePackage;
 import com.autowash.entity.TimeSlot;
 import com.autowash.entity.User;
 import com.autowash.enums.BookingStatus;
+import com.autowash.enums.VehicleSize;
 import com.autowash.exception.AppException;
 import com.autowash.repository.BookingRepository;
 import com.autowash.repository.ServicePackageRepository;
@@ -15,6 +16,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -27,6 +31,9 @@ public class BookingService {
     private final ServicePackageRepository servicePackageRepository;
     private final TimeSlotRepository timeSlotRepository;
     private final NotificationService notificationService;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public List<Booking> getAllBookings() {
         return bookingRepository.findAll();
@@ -43,6 +50,7 @@ public class BookingService {
 
     @Transactional
     public Booking createBooking(Long userId, Long packageId, Long slotId, LocalDate bookingDate, String vehicleSizeStr) {
+        // 1. Kiểm tra sự tồn tại của các thực thể gốc
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException("User not found", HttpStatus.NOT_FOUND));
 
@@ -52,14 +60,15 @@ public class BookingService {
         TimeSlot timeSlot = timeSlotRepository.findById(slotId)
                 .orElseThrow(() -> new AppException("Time slot not found", HttpStatus.NOT_FOUND));
 
-        com.autowash.enums.VehicleSize vehicleSize;
+        // 2. Kiểm tra định dạng kích thước xe
+        VehicleSize vehicleSize;
         try {
-            vehicleSize = com.autowash.enums.VehicleSize.valueOf(vehicleSizeStr.toUpperCase());
+            vehicleSize = VehicleSize.valueOf(vehicleSizeStr.toUpperCase().trim());
         } catch (IllegalArgumentException e) {
             throw new AppException("Invalid vehicle size", HttpStatus.BAD_REQUEST);
         }
 
-        // Capacity check
+        // 3. Kiểm tra các điều kiện giới hạn đặt lịch (Business Rules)
         long activeBookingsCount = bookingRepository.countByTimeSlotSlotIdAndBookingDateAndBookingStatusNot(
                 slotId, bookingDate, BookingStatus.CANCELLED
         );
@@ -67,42 +76,129 @@ public class BookingService {
             throw new AppException("This time slot is fully booked for the selected date", HttpStatus.BAD_REQUEST);
         }
 
-        // User daily booking limit check (at most 3 bookings per day)
         long userBookingsCount = bookingRepository.countByUserUserIdAndBookingDateAndBookingStatusNot(
                 userId, bookingDate, BookingStatus.CANCELLED
         );
-        if (userBookingsCount >= 3) {
-            throw new AppException("You can only book at most 3 times per day", HttpStatus.BAD_REQUEST);
+        if (userBookingsCount >= 2) {
+            throw new AppException("You can only book at most 2 times per day", HttpStatus.BAD_REQUEST);
         }
 
-        // Each slot can only be booked once per day per user (excluding CANCELLED bookings)
-        boolean alreadyBookedSlot = bookingRepository.existsByUserUserIdAndTimeSlotSlotIdAndBookingDateAndBookingStatusNot(
+        long userBookingsInSlotCount = bookingRepository.countByUserUserIdAndTimeSlotSlotIdAndBookingDateAndBookingStatusNot(
                 userId, slotId, bookingDate, BookingStatus.CANCELLED
         );
-        if (alreadyBookedSlot) {
-            throw new AppException("You have already booked this time slot for the selected date", HttpStatus.BAD_REQUEST);
+        if (userBookingsInSlotCount >= 2) {
+            throw new AppException("You can only book at most 2 vehicles in the same time slot", HttpStatus.BAD_REQUEST);
         }
 
+        // =====================================================================
+        // 🟢 ĐỒNG BỘ: ĐỌC HẠNG TỪ BẢNG LoyaltyProfiles (VIẾT HOA ĐÚNG CHUẨN)
+        // =====================================================================
+        BigDecimal basePrice = servicePackage.getPrice();
+        double discountRate = 0.0;
+        String currentTier = "BRONZE";
+
+        List<?> tiers = entityManager.createNativeQuery(
+                        "SELECT current_tier FROM LoyaltyProfiles WHERE user_id = :userId")
+                .setParameter("userId", userId)
+                .getResultList();
+
+        if (!tiers.isEmpty() && tiers.get(0) != null) {
+            currentTier = tiers.get(0).toString().toUpperCase().trim();
+        }
+
+        if ("DIAMOND".equals(currentTier)) {
+            discountRate = 0.10; // Giảm 10%
+        } else if ("GOLD".equals(currentTier)) {
+            discountRate = 0.05;  // Giảm 5%
+        }
+
+        BigDecimal discountAmount = basePrice.multiply(BigDecimal.valueOf(discountRate));
+        BigDecimal finalTotalAmount = basePrice.subtract(discountAmount);
+
+        // 4. Khởi tạo thực thể Booking và lưu xuống DB trước
         Booking booking = Booking.builder()
                 .user(user)
                 .servicePackage(servicePackage)
                 .timeSlot(timeSlot)
                 .bookingDate(bookingDate)
                 .vehicleSize(vehicleSize)
-                .totalAmount(servicePackage.getPrice())
+                .totalAmount(finalTotalAmount)
                 .bookingStatus(BookingStatus.CONFIRMED)
                 .build();
 
-        booking = bookingRepository.save(booking);
+        booking = bookingRepository.save(booking); // ⭐ ĐÃ LƯU ĐƠN ĐẶT LỊCH THÀNH CÔNG
 
-        // Notify
+        // =====================================================================
+        // 🟢 ĐỒNG BỘ: XỬ LÝ TỰ ĐỘNG KHỞI TẠO / CẬP NHẬT TRÊN LoyaltyProfiles
+        // =====================================================================
+        try {
+            int pointsToAdd = 10; // Số điểm cộng thêm cho mỗi lượt đặt thành công
+
+            // Kiểm tra hồ sơ cũ bằng chữ hoa LoyaltyProfiles
+            List<?> profiles = entityManager.createNativeQuery(
+                            "SELECT loyalty_id FROM LoyaltyProfiles WHERE user_id = :userId")
+                    .setParameter("userId", userId)
+                    .getResultList();
+
+            if (profiles.isEmpty()) {
+                // HÀNH ĐỘNG 1: Nếu chưa có hồ sơ -> Tạo mới bản ghi vào LoyaltyProfiles
+                entityManager.createNativeQuery(
+                                "INSERT INTO LoyaltyProfiles (user_id, total_points, current_tier, created_at, updated_at) " +
+                                        "VALUES (:userId, :points, 'BRONZE', GETDATE(), GETDATE())")
+                        .setParameter("userId", userId)
+                        .setParameter("points", pointsToAdd)
+                        .executeUpdate();
+            } else {
+                // HÀNH ĐỘNG 2: Nếu đã có hồ sơ -> Cộng dồn điểm tích lũy vào LoyaltyProfiles
+                entityManager.createNativeQuery(
+                                "UPDATE LoyaltyProfiles " +
+                                        "SET total_points = total_points + :points, updated_at = GETDATE() " +
+                                        "WHERE user_id = :userId")
+                        .setParameter("points", pointsToAdd)
+                        .setParameter("userId", userId)
+                        .executeUpdate();
+
+                // Lấy lại tổng điểm từ LoyaltyProfiles để tính toán thăng hạng
+                Object totalPointsObj = entityManager.createNativeQuery(
+                                "SELECT total_points FROM LoyaltyProfiles WHERE user_id = :userId")
+                        .setParameter("userId", userId)
+                        .getSingleResult();
+
+                if (totalPointsObj != null) {
+                    int finalPoints = ((Number) totalPointsObj).intValue();
+                    String newTier = "BRONZE";
+
+                    if (finalPoints >= 500) {
+                        newTier = "DIAMOND";
+                    } else if (finalPoints >= 300) {
+                        newTier = "GOLD";
+                    } else if (finalPoints >= 100) {
+                        newTier = "SILVER";
+                    }
+
+                    // Cập nhật lại hạng mới nhất vào LoyaltyProfiles
+                    entityManager.createNativeQuery(
+                                    "UPDATE LoyaltyProfiles SET current_tier = :newTier WHERE user_id = :userId")
+                            .setParameter("newTier", newTier)
+                            .setParameter("userId", userId)
+                            .executeUpdate();
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Lỗi xử lý Loyalty Profiles sau khi Booking: " + e.getMessage());
+        }
+        // =====================================================================
+
+        // 5. Gửi thông báo đến người dùng
         notificationService.createNotification(
                 user,
                 "Booking Created",
-                String.format("Đặt lịch thành công cho gói dịch vụ %s vào ngày %s khung giờ %s.", 
-                        servicePackage.getPackageName(), 
-                        bookingDate, 
-                        timeSlot.getStartTime() + " - " + timeSlot.getEndTime())
+                String.format("Đặt lịch thành công cho gói dịch vụ %s vào ngày %s khung giờ %s. Hạng áp dụng đơn này: %s (Ưu đãi giảm %.0f%%).",
+                        servicePackage.getPackageName(),
+                        bookingDate,
+                        timeSlot.getStartTime() + " - " + timeSlot.getEndTime(),
+                        currentTier,
+                        discountRate * 100)
         );
 
         return booking;
@@ -115,7 +211,7 @@ public class BookingService {
 
         BookingStatus status;
         try {
-            status = BookingStatus.valueOf(statusStr.toUpperCase());
+            status = BookingStatus.valueOf(statusStr.toUpperCase().trim());
         } catch (IllegalArgumentException e) {
             throw new AppException("Invalid booking status", HttpStatus.BAD_REQUEST);
         }
@@ -140,17 +236,23 @@ public class BookingService {
 
         return updatedBooking;
     }
+
     @Transactional
     public void cancelBookingByUserSlotAndPackage(Long userId, Long slotId, Long packageId) {
-        // 1. Tìm đơn đặt lịch thỏa mãn cả 3 điều kiện và phải đang ở trạng thái CONFIRMED
         Booking booking = bookingRepository.findByUserUserIdAndTimeSlotSlotIdAndServicePackagePackageIdAndBookingStatus(
                         userId, slotId, packageId, BookingStatus.CONFIRMED)
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn đặt lịch nào phù hợp hoặc đơn hàng đã bị xử lý trước đó", HttpStatus.NOT_FOUND));
 
-        // 2. Chuyển trạng thái đơn hàng sang CANCELLED
         booking.setBookingStatus(BookingStatus.CANCELLED);
-
-        // 3. Lưu lại vào database
         bookingRepository.save(booking);
+
+        notificationService.createNotification(
+                booking.getUser(),
+                "Booking Cancelled",
+                String.format("Đơn đặt lịch gói %s vào ngày %s (Khung giờ: %s) đã được hủy thành công theo yêu cầu.",
+                        booking.getServicePackage().getPackageName(),
+                        booking.getBookingDate(),
+                        booking.getTimeSlot().getStartTime() + " - " + booking.getTimeSlot().getEndTime())
+        );
     }
 }

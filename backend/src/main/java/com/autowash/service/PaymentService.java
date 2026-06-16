@@ -30,96 +30,122 @@ public class PaymentService {
     private final NotificationService notificationService;
 
     public List<Payment> getAllPayments() {
-        return paymentRepository.findAll();
+        return paymentRepository.findAll(); // [cite: 252]
     }
 
     public Payment getPaymentByBookingId(Long bookingId) {
-        return paymentRepository.findByBookingBookingId(bookingId)
-                .orElseThrow(() -> new AppException("Payment not found for this booking", HttpStatus.NOT_FOUND));
+        return paymentRepository.findByBookingBookingId(bookingId) // [cite: 253]
+                .orElseThrow(() -> new AppException("Payment not found for this booking", HttpStatus.NOT_FOUND)); // [cite: 253]
     }
 
     @Transactional
     public Payment createPayment(Long bookingId, BigDecimal amount, String methodStr, String statusStr, String reference) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new AppException("Booking not found", HttpStatus.NOT_FOUND));
+        Booking booking = bookingRepository.findById(bookingId) // [cite: 254]
+                .orElseThrow(() -> new AppException("Booking not found", HttpStatus.NOT_FOUND)); // [cite: 254]
 
         PaymentMethod method;
         try {
-            method = PaymentMethod.valueOf(methodStr.toUpperCase());
+            method = PaymentMethod.valueOf(methodStr.toUpperCase()); // [cite: 255]
         } catch (IllegalArgumentException e) {
-            throw new AppException("Invalid payment method", HttpStatus.BAD_REQUEST);
+            throw new AppException("Invalid payment method", HttpStatus.BAD_REQUEST); // [cite: 256]
         }
 
         PaymentStatus status;
         try {
-            status = PaymentStatus.valueOf(statusStr.toUpperCase());
+            status = PaymentStatus.valueOf(statusStr.toUpperCase()); // [cite: 258]
         } catch (IllegalArgumentException e) {
-            throw new AppException("Invalid payment status", HttpStatus.BAD_REQUEST);
+            throw new AppException("Invalid payment status", HttpStatus.BAD_REQUEST); // [cite: 259]
         }
 
-        Payment payment = Payment.builder()
-                .booking(booking)
-                .amount(amount)
-                .paymentMethod(method)
-                .paymentStatus(status)
-                .transactionReference(reference)
-                .paidAt(LocalDateTime.now())
-                .build();
+        Payment payment = Payment.builder() // [cite: 260]
+                .booking(booking) // [cite: 260]
+                .amount(amount) // [cite: 260]
+                .paymentMethod(method) // [cite: 260]
+                .paymentStatus(status) // [cite: 260]
+                .transactionReference(reference) // [cite: 260]
+                .paidAt(LocalDateTime.now()) // [cite: 261]
+                .build(); // [cite: 261]
 
-        payment = paymentRepository.save(payment);
+        payment = paymentRepository.save(payment); //
 
-        if (status == PaymentStatus.SUCCESS) {
-            User user = booking.getUser();
-            LoyaltyProfile loyaltyProfile = loyaltyProfileRepository.findByUserUserId(user.getUserId())
-                    .orElseGet(() -> LoyaltyProfile.builder()
-                            .user(user)
-                            .totalPoints(0)
-                            .currentTier(Tier.BRONZE)
-                            .build()
+        // --- ĐOẠN ĐƯỢC SỬA ĐỔI THEO BUSINESS RULE MỚI ---
+        if (status == PaymentStatus.SUCCESS) { //
+            User user = booking.getUser(); //
+
+            // 1. Lấy thông tin LoyaltyProfile hiện tại, nếu chưa có thì khởi tạo mặc định BRONZE
+            LoyaltyProfile loyaltyProfile = loyaltyProfileRepository.findByUserUserId(user.getUserId()) // [cite: 263]
+                    .orElseGet(() -> LoyaltyProfile.builder() // [cite: 263]
+                            .user(user) // [cite: 263]
+                            .totalPoints(0) // [cite: 263]
+                            .currentTier(Tier.BRONZE) // [cite: 264]
+                            .build() // [cite: 264]
                     );
 
-            int earnedPoints = amount.divide(BigDecimal.valueOf(1000)).intValue();
-            if (earnedPoints > 0) {
-                int oldPoints = loyaltyProfile.getTotalPoints();
-                int newPoints = oldPoints + earnedPoints;
-                loyaltyProfile.setTotalPoints(newPoints);
+            Tier oldTier = loyaltyProfile.getCurrentTier(); // [cite: 266]
+            int oldPoints = loyaltyProfile.getTotalPoints(); // [cite: 265]
 
-                Tier oldTier = loyaltyProfile.getCurrentTier();
-                Tier newTier = oldTier;
+            // 2. Xác định hệ số nhân điểm (Multiplier) dựa theo HẠNG HIỆN TẠI của khách
+            double multiplier = 1.0;
+            switch (oldTier) {
+                case SILVER:
+                    multiplier = 1.1; // Hạng Bạc nhận hệ số 1.1x (+10% điểm)
+                    break;
+                case GOLD:
+                    multiplier = 1.2; // Hạng Vàng nhận hệ số 1.2x (+20% điểm)
+                    break;
+                case DIAMOND:
+                    multiplier = 1.5; // Hạng Kim Cương nhận hệ số 1.5x (+50% điểm)
+                    break;
+                case BRONZE:
+                default:
+                    multiplier = 1.0; // Mặc định hệ số 1.0x
+                    break;
+            }
 
-                if (newPoints >= 5000) {
-                    newTier = Tier.DIAMOND;
-                } else if (newPoints >= 1500) {
-                    newTier = Tier.GOLD;
-                } else if (newPoints >= 500) {
-                    newTier = Tier.SILVER;
+            // 3. Tính điểm gốc dựa theo quy tắc: Chi tiêu 10,000 VND = 1 điểm
+            int basePoints = amount.divide(BigDecimal.valueOf(10000)).intValue();
+
+            if (basePoints > 0) {
+                // 4. Áp dụng hệ số nhân điểm thưởng (Làm tròn toán học thông thường)
+                int earnedPoints = (int) Math.round(basePoints * multiplier);
+                int newPoints = oldPoints + earnedPoints; // [cite: 266]
+                loyaltyProfile.setTotalPoints(newPoints); // [cite: 266]
+
+                // 5. Cập nhật thứ hạng mới (New Tier) theo thang mốc điểm quy định
+                Tier newTier;
+                if (newPoints >= 1500) {
+                    newTier = Tier.DIAMOND; // Từ 1500 điểm trở lên
+                } else if (newPoints >= 600) {
+                    newTier = Tier.GOLD;    // Từ 600 đến 1499 điểm
+                } else if (newPoints >= 200) {
+                    newTier = Tier.SILVER;  // Từ 200 đến 599 điểm
                 } else {
-                    newTier = Tier.BRONZE;
+                    newTier = Tier.BRONZE;  // Từ 0 đến 199 điểm
                 }
 
-                loyaltyProfile.setCurrentTier(newTier);
-                loyaltyProfileRepository.save(loyaltyProfile);
+                loyaltyProfile.setCurrentTier(newTier); // [cite: 271]
+                loyaltyProfileRepository.save(loyaltyProfile); // [cite: 271]
 
-                // Notify points earned
-                notificationService.createNotification(
-                        user,
-                        "Points Earned",
-                        String.format("Bạn vừa được cộng %d điểm từ giao dịch thanh toán hóa đơn. Tổng điểm hiện tại: %d.", 
-                                earnedPoints, newPoints)
+                // 6. Gửi thông báo chi tiết số điểm thưởng nhận được kèm hệ số nhân áp dụng
+                notificationService.createNotification( // [cite: 271]
+                        user, // [cite: 272]
+                        "Points Earned", // [cite: 272]
+                        String.format("Bạn vừa được cộng %d điểm tích lũy (Hệ số %sx từ hạng %s) từ hóa đơn thanh toán. Tổng điểm hiện tại: %d.",
+                                earnedPoints, multiplier, oldTier.name(), newPoints)
                 );
 
-                // Check and notify for tier upgrade
-                if (newTier != oldTier) {
-                    notificationService.createNotification(
-                            user,
-                            "Loyalty Tier Upgraded",
-                            String.format("Chúc mừng bạn đã thăng hạng thành viên từ %s lên %s!", 
-                                    oldTier.name(), newTier.name())
+                // 7. Bắn thông báo chúc mừng riêng nếu tài khoản được thăng hạng thành công
+                if (newTier != oldTier) { // [cite: 274]
+                    notificationService.createNotification( // [cite: 274]
+                            user, // [cite: 274]
+                            "Loyalty Tier Upgraded", // [cite: 275]
+                            String.format("Chúc mừng bạn đã thăng hạng thành viên từ %s lên %s!",  // [cite: 275]
+                                    oldTier.name(), newTier.name()) // [cite: 275]
                     );
                 }
             }
         }
 
-        return payment;
+        return payment; // [cite: 276]
     }
 }

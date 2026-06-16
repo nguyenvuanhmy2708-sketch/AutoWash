@@ -6,29 +6,31 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-<<<<<<< HEAD
 
-import com.autowash.enums.BookingStatus;
-=======
->>>>>>> main
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
-<<<<<<< HEAD
-    List<Booking> findByUserUserId(Long userId);
-    List<Booking> findByBookingDate(LocalDate bookingDate);
-    long countByTimeSlotSlotIdAndBookingDateAndBookingStatusNot(Long slotId, LocalDate bookingDate, BookingStatus status);
-    long countByUserUserIdAndBookingDateAndBookingStatusNot(Long userId, LocalDate bookingDate, BookingStatus status);
-    boolean existsByUserUserIdAndTimeSlotSlotIdAndBookingDateAndBookingStatusNot(Long userId, Long slotId, LocalDate bookingDate, BookingStatus status);
-}
-=======
-    List<Booking> findByUserUserId(Long userId); // Giữ nguyên
-    List<Booking> findByBookingDate(LocalDate bookingDate); // Giữ nguyên
 
-    // Hàm mới có @Query để phục vụ tính năng hủy lịch theo User và Slot của bạn
+    List<Booking> findByUserUserId(Long userId);
+
+    List<Booking> findByBookingDate(LocalDate bookingDate);
+
+    // Đếm số lượng đơn đặt trong một Slot vào ngày cụ thể (Tránh quá tải Slot)
+    long countByTimeSlotSlotIdAndBookingDateAndBookingStatusNot(Long slotId, LocalDate bookingDate, BookingStatus status);
+
+    // Đếm số lượng đơn đặt của 1 User trong ngày (Giới hạn tối đa 3 đơn/ngày)
+    long countByUserUserIdAndBookingDateAndBookingStatusNot(Long userId, LocalDate bookingDate, BookingStatus status);
+
+    // Kiểm tra xem User đã đặt Slot này vào ngày này chưa
+    boolean existsByUserUserIdAndTimeSlotSlotIdAndBookingDateAndBookingStatusNot(Long userId, Long slotId, LocalDate bookingDate, BookingStatus status);
+
+    // --- HÀM MỚI ĐƯỢC THÊM VÀO GIÚP ĐẾM SỐ XE TRONG CÙNG MỘT KHUNG GIỜ ---
+    long countByUserUserIdAndTimeSlotSlotIdAndBookingDateAndBookingStatusNot(Long userId, Long slotId, LocalDate bookingDate, BookingStatus status);
+
+    // Hàm phục vụ tính năng hủy lịch theo User, Slot và Gói dịch vụ
     @Query("SELECT b FROM Booking b WHERE b.user.userId = :userId " +
             "AND b.timeSlot.slotId = :slotId " +
             "AND b.servicePackage.packageId = :packageId " +
@@ -39,4 +41,3 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("packageId") Long packageId,
             @Param("status") BookingStatus status);
 }
->>>>>>> main
