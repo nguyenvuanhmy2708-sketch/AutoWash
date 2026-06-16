@@ -34,7 +34,7 @@ import java.math.BigDecimal;
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final WalletRepository walletRepository;
+    private final WalletService walletService;
     private final LoyaltyProfileRepository loyaltyProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
@@ -83,11 +83,7 @@ public class AuthService {
         user = userRepository.save(user);
 
         // Create and save Wallet
-        Wallet wallet = Wallet.builder()
-                .user(user)
-                .balance(BigDecimal.ZERO)
-                .build();
-        walletRepository.save(wallet);
+        walletService.createWallet(user);
 
         // Create and save Loyalty Profile
         LoyaltyProfile loyaltyProfile = LoyaltyProfile.builder()

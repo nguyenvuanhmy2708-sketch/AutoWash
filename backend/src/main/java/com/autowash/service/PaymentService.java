@@ -11,14 +11,18 @@ import com.autowash.entity.LoyaltyProfile;
 import com.autowash.entity.User;
 import com.autowash.enums.Tier;
 import com.autowash.repository.LoyaltyProfileRepository;
+import com.autowash.config.VNPayConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +32,8 @@ public class PaymentService {
     private final BookingRepository bookingRepository;
     private final LoyaltyProfileRepository loyaltyProfileRepository;
     private final NotificationService notificationService;
+    private final WalletService walletService;
+    private final VNPayConfig vnPayConfig;
 
     public List<Payment> getAllPayments() {
         return paymentRepository.findAll(); // [cite: 252]
@@ -65,6 +71,10 @@ public class PaymentService {
                 .transactionReference(reference) // [cite: 260]
                 .paidAt(LocalDateTime.now()) // [cite: 261]
                 .build(); // [cite: 261]
+
+        if (method == PaymentMethod.WALLET && status == PaymentStatus.SUCCESS) {
+            walletService.pay(booking.getUser().getUserId(), amount, bookingId, "Thanh toán booking #" + bookingId);
+        }
 
         payment = paymentRepository.save(payment); //
 
@@ -147,5 +157,64 @@ public class PaymentService {
         }
 
         return payment; // [cite: 276]
+    }
+
+    public String createVNPayUrl(Long bookingId, String ipAddress) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new AppException("Booking not found", HttpStatus.NOT_FOUND));
+
+        long amount = booking.getTotalAmount().multiply(BigDecimal.valueOf(100)).longValue();
+
+        Map<String, String> vnpParams = new HashMap<>();
+        vnpParams.put("vnp_Version", "2.1.0");
+        vnpParams.put("vnp_Command", "pay");
+        vnpParams.put("vnp_TmnCode", vnPayConfig.getTmnCode());
+        vnpParams.put("vnp_Amount", String.valueOf(amount));
+        vnpParams.put("vnp_CurrCode", "VND");
+        vnpParams.put("vnp_TxnRef", bookingId + "_" + System.currentTimeMillis());
+        vnpParams.put("vnp_OrderInfo", "Thanh toan booking " + bookingId);
+        vnpParams.put("vnp_OrderType", "other");
+        vnpParams.put("vnp_Locale", "vn");
+        vnpParams.put("vnp_ReturnUrl", vnPayConfig.getReturnUrl());
+        vnpParams.put("vnp_IpAddr", ipAddress != null ? ipAddress : "127.0.0.1");
+
+        java.text.SimpleDateFormat formatter = new java.text.SimpleDateFormat("yyyyMMddHHmmss");
+        String vnpCreateDate = formatter.format(new java.util.Date());
+        vnpParams.put("vnp_CreateDate", vnpCreateDate);
+
+        String secureHash = vnPayConfig.hashAllFields(vnpParams);
+
+        List<String> fieldNames = new ArrayList<>(vnpParams.keySet());
+        Collections.sort(fieldNames);
+        StringBuilder query = new StringBuilder();
+        for (String fieldName : fieldNames) {
+            String fieldValue = vnpParams.get(fieldName);
+            if (fieldValue != null && fieldValue.length() > 0) {
+                try {
+                    query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()))
+                         .append("=")
+                         .append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()).replace("+", "%20"))
+                         .append("&");
+                } catch (UnsupportedEncodingException e) {
+                    // Ignore
+                }
+            }
+        }
+        query.append("vnp_SecureHash=").append(secureHash);
+
+        return vnPayConfig.getPayUrl() + "?" + query.toString();
+    }
+
+    public boolean verifyVNPaySignature(Map<String, String> params, String secureHash) {
+        Map<String, String> hashParams = new HashMap<>();
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            if (!key.equals("vnp_SecureHash") && !key.equals("vnp_SecureHashType")) {
+                hashParams.put(key, value);
+            }
+        }
+        String calculatedHash = vnPayConfig.hashAllFields(hashParams);
+        return calculatedHash.equalsIgnoreCase(secureHash);
     }
 }
