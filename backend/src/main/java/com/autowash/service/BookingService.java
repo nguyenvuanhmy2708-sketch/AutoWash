@@ -11,6 +11,8 @@ import com.autowash.repository.BookingRepository;
 import com.autowash.repository.ServicePackageRepository;
 import com.autowash.repository.TimeSlotRepository;
 import com.autowash.repository.UserRepository;
+import com.autowash.enums.Role;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -31,6 +33,8 @@ public class BookingService {
     private final ServicePackageRepository servicePackageRepository;
     private final TimeSlotRepository timeSlotRepository;
     private final NotificationService notificationService;
+    private final WalletService walletService;
+    private final PasswordEncoder passwordEncoder;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -254,5 +258,139 @@ public class BookingService {
                         booking.getBookingDate(),
                         booking.getTimeSlot().getStartTime() + " - " + booking.getTimeSlot().getEndTime())
         );
+    }
+
+    @Transactional
+    public Booking createWalkInBooking(String phoneNumber, String fullName, Long packageId, Long slotId, LocalDate bookingDate, String vehicleSizeStr) {
+        User user = userRepository.findByPhoneNumber(phoneNumber.trim())
+                .orElseGet(() -> {
+                    String email = phoneNumber.trim() + "@autowash.com";
+                    User newUser = User.builder()
+                            .fullName(fullName != null ? fullName.trim() : "Khách vãng lai")
+                            .phoneNumber(phoneNumber.trim())
+                            .email(email)
+                            .passwordHash(passwordEncoder.encode(phoneNumber.trim()))
+                            .role(Role.CUSTOMER)
+                            .isActive(true)
+                            .build();
+                    newUser = userRepository.save(newUser);
+                    walletService.createWallet(newUser);
+                    return newUser;
+                });
+
+        ServicePackage servicePackage = servicePackageRepository.findById(packageId)
+                .orElseThrow(() -> new AppException("Service package not found", HttpStatus.NOT_FOUND));
+
+        TimeSlot timeSlot = timeSlotRepository.findById(slotId)
+                .orElseThrow(() -> new AppException("Time slot not found", HttpStatus.NOT_FOUND));
+
+        VehicleSize vehicleSize;
+        try {
+            vehicleSize = VehicleSize.valueOf(vehicleSizeStr.toUpperCase().trim());
+        } catch (IllegalArgumentException e) {
+            throw new AppException("Invalid vehicle size", HttpStatus.BAD_REQUEST);
+        }
+
+        long activeBookingsCount = bookingRepository.countByTimeSlotSlotIdAndBookingDateAndBookingStatusNot(
+                slotId, bookingDate, BookingStatus.CANCELLED
+        );
+        if (activeBookingsCount >= timeSlot.getCapacity()) {
+            throw new AppException("This time slot is fully booked for the selected date", HttpStatus.BAD_REQUEST);
+        }
+
+        BigDecimal basePrice = servicePackage.getPrice();
+        double discountRate = 0.0;
+        String currentTier = "BRONZE";
+
+        List<?> tiers = entityManager.createNativeQuery(
+                        "SELECT current_tier FROM LoyaltyProfiles WHERE user_id = :userId")
+                .setParameter("userId", user.getUserId())
+                .getResultList();
+
+        if (!tiers.isEmpty() && tiers.get(0) != null) {
+            currentTier = tiers.get(0).toString().toUpperCase().trim();
+        }
+
+        if ("DIAMOND".equals(currentTier)) {
+            discountRate = 0.10;
+        } else if ("GOLD".equals(currentTier)) {
+            discountRate = 0.05;
+        }
+
+        BigDecimal discountAmount = basePrice.multiply(BigDecimal.valueOf(discountRate));
+        BigDecimal finalTotalAmount = basePrice.subtract(discountAmount);
+
+        Booking booking = Booking.builder()
+                .user(user)
+                .servicePackage(servicePackage)
+                .timeSlot(timeSlot)
+                .bookingDate(bookingDate)
+                .vehicleSize(vehicleSize)
+                .totalAmount(finalTotalAmount)
+                .bookingStatus(BookingStatus.CONFIRMED)
+                .build();
+
+        booking = bookingRepository.save(booking);
+
+        try {
+            int pointsToAdd = 10;
+            List<?> profiles = entityManager.createNativeQuery(
+                            "SELECT loyalty_id FROM LoyaltyProfiles WHERE user_id = :userId")
+                    .setParameter("userId", user.getUserId())
+                    .getResultList();
+
+            if (profiles.isEmpty()) {
+                entityManager.createNativeQuery(
+                                "INSERT INTO LoyaltyProfiles (user_id, total_points, current_tier, created_at, updated_at) " +
+                                        "VALUES (:userId, :points, 'BRONZE', GETDATE(), GETDATE())")
+                        .setParameter("userId", user.getUserId())
+                        .setParameter("points", pointsToAdd)
+                        .executeUpdate();
+            } else {
+                entityManager.createNativeQuery(
+                                "UPDATE LoyaltyProfiles " +
+                                        "SET total_points = total_points + :points, updated_at = GETDATE() " +
+                                        "WHERE user_id = :userId")
+                        .setParameter("points", pointsToAdd)
+                        .setParameter("userId", user.getUserId())
+                        .executeUpdate();
+
+                Object totalPointsObj = entityManager.createNativeQuery(
+                                "SELECT total_points FROM LoyaltyProfiles WHERE user_id = :userId")
+                        .setParameter("userId", user.getUserId())
+                        .getSingleResult();
+
+                if (totalPointsObj != null) {
+                    int finalPoints = ((Number) totalPointsObj).intValue();
+                    String newTier = "BRONZE";
+                    if (finalPoints >= 500) {
+                        newTier = "DIAMOND";
+                    } else if (finalPoints >= 300) {
+                        newTier = "GOLD";
+                    } else if (finalPoints >= 100) {
+                        newTier = "SILVER";
+                    }
+
+                    entityManager.createNativeQuery(
+                                    "UPDATE LoyaltyProfiles SET current_tier = :newTier WHERE user_id = :userId")
+                            .setParameter("newTier", newTier)
+                            .setParameter("userId", user.getUserId())
+                            .executeUpdate();
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Lỗi xử lý Loyalty Profiles sau khi Walk-in Booking: " + e.getMessage());
+        }
+
+        notificationService.createNotification(
+                user,
+                "Walk-in Booking Created",
+                String.format("Lễ tân đã đăng ký gói dịch vụ %s cho quý khách vào lúc %s ngày %s thành công.",
+                        servicePackage.getPackageName(),
+                        timeSlot.getStartTime() + " - " + timeSlot.getEndTime(),
+                        bookingDate)
+        );
+
+        return booking;
     }
 }

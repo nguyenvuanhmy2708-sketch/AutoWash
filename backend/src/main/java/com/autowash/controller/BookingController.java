@@ -45,6 +45,19 @@ public class BookingController {
         return new ResponseEntity<>(booking, HttpStatus.CREATED);
     }
 
+    @PostMapping("/walk-in")
+    public ResponseEntity<Booking> createWalkInBooking(@RequestBody WalkInBookingRequest request) {
+        Booking booking = bookingService.createWalkInBooking(
+                request.getPhoneNumber(),
+                request.getFullName(),
+                request.getPackageId(),
+                request.getSlotId(),
+                request.getBookingDate(),
+                request.getVehicleSize()
+        );
+        return new ResponseEntity<>(booking, HttpStatus.CREATED);
+    }
+
     @PutMapping("/{id}/status")
     public ResponseEntity<Booking> updateStatus(@PathVariable Long id, @RequestParam String status) {
         return ResponseEntity.ok(bookingService.updateStatus(id, status));
@@ -58,6 +71,17 @@ public class BookingController {
         private LocalDate bookingDate;
         private String vehicleSize;
     }
+
+    @Data
+    public static class WalkInBookingRequest {
+        private String phoneNumber;
+        private String fullName;
+        private Long packageId;
+        private Long slotId;
+        private LocalDate bookingDate;
+        private String vehicleSize;
+    }
+
     @PutMapping("/cancel")
     public ResponseEntity<java.util.Map<String, String>> cancelBooking(
             @RequestParam Long userId,
