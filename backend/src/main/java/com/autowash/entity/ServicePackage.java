@@ -39,7 +39,7 @@ public class ServicePackage {
     @Column(name = "package_name", nullable = false, length = 100)
     private String packageName;
 
-    @Column(name = "price", nullable = false)
+    @Column(name = "price", nullable = false, columnDefinition = "DECIMAL(12,0)")
     private BigDecimal price;
 
     @Column(name = "description", columnDefinition = "NVARCHAR(MAX)")

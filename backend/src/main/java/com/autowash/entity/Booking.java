@@ -61,7 +61,7 @@ public class Booking {
     @Column(name = "booking_status", nullable = false, length = 20)
     private BookingStatus bookingStatus;
 
-    @Column(name = "total_amount", nullable = false)
+    @Column(name = "total_amount", nullable = false, columnDefinition = "DECIMAL(12,0)")
     private BigDecimal totalAmount;
 
     @Column(name = "created_at", nullable = false, updatable = false)

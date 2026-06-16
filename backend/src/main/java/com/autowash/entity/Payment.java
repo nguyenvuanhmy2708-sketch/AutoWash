@@ -41,7 +41,7 @@ public class Payment {
     )
     private Booking booking;
 
-    @Column(name = "amount", nullable = false)
+    @Column(name = "amount", nullable = false, columnDefinition = "DECIMAL(12,0)")
     private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)

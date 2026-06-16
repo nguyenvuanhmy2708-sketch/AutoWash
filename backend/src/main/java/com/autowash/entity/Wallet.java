@@ -37,7 +37,7 @@ public class Wallet {
     )
     private User user;
 
-    @Column(name = "balance", nullable = false)
+    @Column(name = "balance", nullable = false, columnDefinition = "DECIMAL(12,0)")
     private BigDecimal balance;
 
     @Column(name = "created_at", nullable = false, updatable = false)

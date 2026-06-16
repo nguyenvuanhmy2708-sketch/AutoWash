@@ -27,6 +27,9 @@ public class BookingService {
     private final ServicePackageRepository servicePackageRepository;
     private final TimeSlotRepository timeSlotRepository;
     private final NotificationService notificationService;
+    private final com.autowash.repository.PaymentRepository paymentRepository;
+    private final com.autowash.repository.WalletRepository walletRepository;
+    private final WalletTransactionService walletTransactionService;
 
     public List<Booking> getAllBookings() {
         return bookingRepository.findAll();
@@ -60,24 +63,25 @@ public class BookingService {
         }
 
         // Capacity check
-        long activeBookingsCount = bookingRepository.countByTimeSlotSlotIdAndBookingDateAndBookingStatusNot(
-                slotId, bookingDate, BookingStatus.CANCELLED
+        java.util.List<BookingStatus> inactiveStatuses = java.util.List.of(BookingStatus.CANCELLED, BookingStatus.NO_SHOW);
+        long activeBookingsCount = bookingRepository.countByTimeSlotSlotIdAndBookingDateAndBookingStatusNotIn(
+                slotId, bookingDate, inactiveStatuses
         );
         if (activeBookingsCount >= timeSlot.getCapacity()) {
             throw new AppException("This time slot is fully booked for the selected date", HttpStatus.BAD_REQUEST);
         }
-
+ 
         // User daily booking limit check (at most 3 bookings per day)
-        long userBookingsCount = bookingRepository.countByUserUserIdAndBookingDateAndBookingStatusNot(
-                userId, bookingDate, BookingStatus.CANCELLED
+        long userBookingsCount = bookingRepository.countByUserUserIdAndBookingDateAndBookingStatusNotIn(
+                userId, bookingDate, inactiveStatuses
         );
         if (userBookingsCount >= 3) {
             throw new AppException("You can only book at most 3 times per day", HttpStatus.BAD_REQUEST);
         }
-
-        // Each slot can only be booked once per day per user (excluding CANCELLED bookings)
-        boolean alreadyBookedSlot = bookingRepository.existsByUserUserIdAndTimeSlotSlotIdAndBookingDateAndBookingStatusNot(
-                userId, slotId, bookingDate, BookingStatus.CANCELLED
+ 
+        // Each slot can only be booked once per day per user (excluding CANCELLED and NO_SHOW bookings)
+        boolean alreadyBookedSlot = bookingRepository.existsByUserUserIdAndTimeSlotSlotIdAndBookingDateAndBookingStatusNotIn(
+                userId, slotId, bookingDate, inactiveStatuses
         );
         if (alreadyBookedSlot) {
             throw new AppException("You have already booked this time slot for the selected date", HttpStatus.BAD_REQUEST);
@@ -130,11 +134,74 @@ public class BookingService {
                     "Booking Cancelled",
                     String.format("Lượt đặt lịch ngày %s đã bị hủy thành công.", booking.getBookingDate())
             );
+
+            // Process refund if payment exists and is SUCCESS
+            paymentRepository.findByBookingBookingId(bookingId).ifPresent(payment -> {
+                if (payment.getPaymentStatus() == com.autowash.enums.PaymentStatus.SUCCESS) {
+                    java.time.LocalDateTime appointmentTime = java.time.LocalDateTime.of(
+                            booking.getBookingDate(), 
+                            booking.getTimeSlot().getStartTime()
+                    );
+                    java.time.LocalDateTime cancellationTime = java.time.LocalDateTime.now();
+                    java.time.Duration duration = java.time.Duration.between(cancellationTime, appointmentTime);
+                    long minutes = duration.toMinutes();
+
+                    double refundPercentage = 0.0;
+                    if (minutes >= 1440) { // >= 24 hours
+                        refundPercentage = 100.0;
+                    } else if (minutes >= 360) { // 6 hours to < 24 hours
+                        refundPercentage = 50.0;
+                    } else { // < 6 hours
+                        refundPercentage = 0.0;
+                    }
+
+                    if (refundPercentage > 0.0) {
+                        java.math.BigDecimal refundAmount = payment.getAmount()
+                                .multiply(java.math.BigDecimal.valueOf(refundPercentage))
+                                .divide(java.math.BigDecimal.valueOf(100), java.math.RoundingMode.HALF_UP);
+
+                        com.autowash.entity.User user = booking.getUser();
+                        com.autowash.entity.Wallet wallet = walletRepository.findByUserUserId(user.getUserId())
+                                .orElseGet(() -> {
+                                    com.autowash.entity.Wallet newWallet = com.autowash.entity.Wallet.builder()
+                                            .user(user)
+                                            .balance(java.math.BigDecimal.ZERO)
+                                            .build();
+                                    return walletRepository.save(newWallet);
+                                });
+
+                        // Call transaction service to create REFUND transaction and adjust wallet balance
+                        walletTransactionService.createTransaction(
+                                wallet.getWalletId(),
+                                bookingId,
+                                refundAmount,
+                                "REFUND",
+                                String.format("Hoàn tiền %.0f%% cho lịch đặt #%d bị hủy.", refundPercentage, bookingId)
+                        );
+
+                        // Set payment status to REFUNDED
+                        payment.setPaymentStatus(com.autowash.enums.PaymentStatus.REFUNDED);
+                        paymentRepository.save(payment);
+                    }
+                }
+            });
         } else if (status == BookingStatus.COMPLETED && oldStatus != BookingStatus.COMPLETED) {
             notificationService.createNotification(
                     booking.getUser(),
                     "Booking Completed",
                     String.format("Lượt rửa xe ngày %s đã hoàn thành. Cảm ơn quý khách!", booking.getBookingDate())
+            );
+        } else if (status == BookingStatus.CHECKED_IN && oldStatus != BookingStatus.CHECKED_IN) {
+            notificationService.createNotification(
+                    booking.getUser(),
+                    "Booking Checked In",
+                    String.format("Khách hàng đã check-in thành công cho lịch đặt xe ngày %s.", booking.getBookingDate())
+            );
+        } else if (status == BookingStatus.NO_SHOW && oldStatus != BookingStatus.NO_SHOW) {
+            notificationService.createNotification(
+                    booking.getUser(),
+                    "Booking No Show",
+                    String.format("Lượt đặt lịch ngày %s đã bị hủy do quá 15 phút từ thời điểm bắt đầu khung giờ mà quý khách chưa check-in.", booking.getBookingDate())
             );
         }
 

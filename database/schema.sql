@@ -1,4 +1,4 @@
-﻿USE AutoWash;
+USE AutoWash;
 GO
 
 -- 1. XÓA BẢNG CŨ (Nếu đã tồn tại) - Phải xóa theo đúng thứ tự khóa ngoại
@@ -71,7 +71,7 @@ CREATE TABLE Bookings (
     CONSTRAINT FK_Bookings_ServicePackages FOREIGN KEY (package_id) REFERENCES ServicePackages(package_id),
     CONSTRAINT FK_Bookings_TimeSlots FOREIGN KEY (slot_id) REFERENCES TimeSlots(slot_id),
     CONSTRAINT CK_Bookings_VehicleSize CHECK (vehicle_size IN ('SMALL', 'MEDIUM', 'LARGE')),
-    CONSTRAINT CK_Bookings_Status CHECK (booking_status IN ('CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'))
+    CONSTRAINT CK_Bookings_Status CHECK (booking_status IN ('CONFIRMED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED', 'NO_SHOW'))
 );
 GO
 
