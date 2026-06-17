@@ -51,7 +51,7 @@ public class AuthService {
             throw new AppException("Full name is required", HttpStatus.BAD_REQUEST);
         }
         if (request.getPhoneNumber() == null || request.getPhoneNumber().trim().isEmpty()) {
-            throw new AppException("Phone number is required", HttpStatus.BAD_REQUEST);
+            throw new AppException(" number is required", HttpStatus.BAD_REQUEST);
         }
         if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
             throw new AppException("Email is required", HttpStatus.BAD_REQUEST);

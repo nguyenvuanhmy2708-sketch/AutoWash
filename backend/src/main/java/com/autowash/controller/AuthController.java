@@ -46,6 +46,7 @@ public class AuthController {
         authService.resetPassword(request);
         return ResponseEntity.ok().build();
     }
+
     @PostMapping("/logout")
     public ResponseEntity<Map<String, String>> logout() {
         Map<String, String> response = new java.util.HashMap<>();
