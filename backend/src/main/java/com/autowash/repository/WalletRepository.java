@@ -4,6 +4,14 @@ import com.autowash.entity.Wallet;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+<<<<<<< HEAD
 @Repository
 public interface WalletRepository extends JpaRepository<Wallet, Long> {
+=======
+import java.util.Optional;
+
+@Repository
+public interface WalletRepository extends JpaRepository<Wallet, Long> {
+    Optional<Wallet> findByUserUserId(Long userId);
+>>>>>>> main
 }

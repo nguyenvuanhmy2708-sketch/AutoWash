@@ -25,8 +25,12 @@ import com.autowash.dto.ResetPasswordRequest;
 import com.autowash.entity.PasswordResetToken;
 import com.autowash.repository.PasswordResetTokenRepository;
 import java.time.LocalDateTime;
+<<<<<<< HEAD
 import java.util.UUID;
 
+=======
+import java.security.SecureRandom;
+>>>>>>> main
 import java.math.BigDecimal;
 
 @Service
@@ -46,7 +50,10 @@ public class AuthService {
 
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
+<<<<<<< HEAD
         // Validation Checks
+=======
+>>>>>>> main
         if (request.getFullName() == null || request.getFullName().trim().isEmpty()) {
             throw new AppException("Full name is required", HttpStatus.BAD_REQUEST);
         }
@@ -60,17 +67,26 @@ public class AuthService {
             throw new AppException("Password is required", HttpStatus.BAD_REQUEST);
         }
 
+<<<<<<< HEAD
         // Email uniqueness validation
+=======
+>>>>>>> main
         if (userRepository.existsByEmail(request.getEmail().trim())) {
             throw new AppException("Email is already registered", HttpStatus.BAD_REQUEST);
         }
 
+<<<<<<< HEAD
         // Phone number uniqueness validation
+=======
+>>>>>>> main
         if (userRepository.existsByPhoneNumber(request.getPhoneNumber().trim())) {
             throw new AppException("Phone number is already registered", HttpStatus.BAD_REQUEST);
         }
 
+<<<<<<< HEAD
         // Create and save User
+=======
+>>>>>>> main
         User user = User.builder()
                 .fullName(request.getFullName().trim())
                 .phoneNumber(request.getPhoneNumber().trim())
@@ -82,14 +98,20 @@ public class AuthService {
 
         user = userRepository.save(user);
 
+<<<<<<< HEAD
         // Create and save Wallet
+=======
+>>>>>>> main
         Wallet wallet = Wallet.builder()
                 .user(user)
                 .balance(BigDecimal.ZERO)
                 .build();
         walletRepository.save(wallet);
 
+<<<<<<< HEAD
         // Create and save Loyalty Profile
+=======
+>>>>>>> main
         LoyaltyProfile loyaltyProfile = LoyaltyProfile.builder()
                 .user(user)
                 .totalPoints(0)
@@ -117,6 +139,10 @@ public class AuthService {
             throw new AppException("User account is inactive", HttpStatus.FORBIDDEN);
         }
 
+<<<<<<< HEAD
+=======
+        // ĐÃ SỬA: Bỏ dấu ngoặc thừa ở cuối dòng này gây ra 3 lỗi compile
+>>>>>>> main
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new AppException("Invalid email or password", HttpStatus.UNAUTHORIZED);
         }
@@ -142,11 +168,19 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail().trim())
                 .orElseThrow(() -> new AppException("Email is not registered", HttpStatus.NOT_FOUND));
 
+<<<<<<< HEAD
         // Delete existing tokens for this user
         tokenRepository.deleteByUser(user);
 
         // Generate token
         String token = UUID.randomUUID().toString();
+=======
+        tokenRepository.deleteByUser(user);
+
+        SecureRandom random = new SecureRandom();
+        int code = 100000 + random.nextInt(900000);
+        String token = String.valueOf(code);
+>>>>>>> main
         PasswordResetToken resetToken = PasswordResetToken.builder()
                 .token(token)
                 .user(user)
@@ -155,9 +189,14 @@ public class AuthService {
 
         tokenRepository.save(resetToken);
 
+<<<<<<< HEAD
         // Send email
         String resetLink = frontendUrl + "/reset-password?token=" + token;
         emailService.sendResetPasswordEmail(user.getEmail(), resetLink);
+=======
+        // ĐÃ SỬA: Đổi tên hàm sendResetPasswordCode thành sendResetPasswordEmail để khớp với file EmailService của bạn
+        emailService.sendResetPasswordEmail(user.getEmail(), token);
+>>>>>>> main
     }
 
     @Transactional
@@ -181,7 +220,10 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
 
+<<<<<<< HEAD
         // Clean up token
+=======
+>>>>>>> main
         tokenRepository.delete(resetToken);
     }
 }

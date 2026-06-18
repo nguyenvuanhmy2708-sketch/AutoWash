@@ -1,9 +1,13 @@
 USE AutoWash;
 GO
 
+<<<<<<< HEAD
 -- =========================================================================
 -- 🟢 BƯỚC 1: DỌN SẠCH DỮ LIỆU TRONG CÁC BẢNG TRƯỚC KHI INSERT
 -- =========================================================================
+=======
+
+>>>>>>> main
 DELETE FROM PasswordResetTokens;
 DELETE FROM Notifications;
 DELETE FROM Payments;
@@ -16,9 +20,13 @@ DELETE FROM ServicePackages;
 DELETE FROM Users;
 GO
 
+<<<<<<< HEAD
 -- =========================================================================
 -- 🟢 BƯỚC 2: CHÈN DỮ LIỆU DANH MỤC GỐC SẠCH SẼ
 -- =========================================================================
+=======
+
+>>>>>>> main
 
 -- 1. CHÈN BẢNG USERS
 INSERT INTO Users (full_name, phone_number, email, password_hash, role)
@@ -54,4 +62,7 @@ VALUES
 ('19:00', '20:00');
 GO
 
+<<<<<<< HEAD
 -- ❌ ĐÃ XÓA PHẦN INSERT LOYALTY PROFILES BAN ĐẦU THEO ĐÚNG TIẾN TRÌNH LUỒNG ĐẶT LỊCH
+=======
+>>>>>>> main
