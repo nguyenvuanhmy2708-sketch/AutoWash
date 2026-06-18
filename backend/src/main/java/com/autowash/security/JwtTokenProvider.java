@@ -35,4 +35,21 @@ public class JwtTokenProvider {
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
+    public String getEmailFromToken(String token) {
+        io.jsonwebtoken.Claims claims = io.jsonwebtoken.Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return claims.getSubject();
+    }
+
+    public boolean validateToken(String token) {
+        try {
+            io.jsonwebtoken.Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token);
+            return true;
+        } catch (Exception ex) {
+            return false;
+        }
+    }
 }

@@ -43,6 +43,13 @@ public class PaymentService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException("Booking not found", HttpStatus.NOT_FOUND));
 
+        // RÀNG BUỘC THANH TOÁN: Kiểm tra số tiền truyền vào so với hóa đơn thực tế của Booking
+        if (amount.compareTo(booking.getTotalAmount()) > 0) {
+            throw new AppException("Số tiền thanh toán vượt quá hạn mức hóa đơn của gói dịch vụ!", HttpStatus.BAD_REQUEST);
+        } else if (amount.compareTo(booking.getTotalAmount()) < 0) {
+            throw new AppException("Số tiền chưa đủ để thanh toán gói dịch vụ này, vui lòng nạp thêm!", HttpStatus.BAD_REQUEST);
+        }
+
         PaymentMethod method;
         try {
             method = PaymentMethod.valueOf(methodStr.toUpperCase());
