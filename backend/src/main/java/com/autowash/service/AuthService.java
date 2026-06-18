@@ -24,8 +24,8 @@ import com.autowash.dto.ForgotPasswordRequest;
 import com.autowash.dto.ResetPasswordRequest;
 import com.autowash.entity.PasswordResetToken;
 import com.autowash.repository.PasswordResetTokenRepository;
-import java.time.LocalDateTime;
-import java.util.UUID;
+import java.time.Instant;
+import java.security.SecureRandom;
 
 import java.math.BigDecimal;
 
@@ -145,19 +145,20 @@ public class AuthService {
         // Delete existing tokens for this user
         tokenRepository.deleteByUser(user);
 
-        // Generate token
-        String token = UUID.randomUUID().toString();
+        // Generate 6-digit verification code
+        SecureRandom random = new SecureRandom();
+        int code = 100000 + random.nextInt(900000);
+        String token = String.valueOf(code);
         PasswordResetToken resetToken = PasswordResetToken.builder()
                 .token(token)
                 .user(user)
-                .expiryDate(LocalDateTime.now().plusMinutes(15))
+                .expiryDate(Instant.now().plusSeconds(900))
                 .build();
 
         tokenRepository.save(resetToken);
 
         // Send email
-        String resetLink = frontendUrl + "/reset-password?token=" + token;
-        emailService.sendResetPasswordEmail(user.getEmail(), resetLink);
+        emailService.sendResetPasswordCode(user.getEmail(), token);
     }
 
     @Transactional
