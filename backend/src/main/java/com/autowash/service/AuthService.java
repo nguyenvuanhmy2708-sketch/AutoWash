@@ -25,8 +25,6 @@ import com.autowash.dto.ResetPasswordRequest;
 import com.autowash.entity.PasswordResetToken;
 import com.autowash.repository.PasswordResetTokenRepository;
 import java.time.LocalDateTime;
-import java.util.UUID;
-
 import java.math.BigDecimal;
 
 @Service
@@ -34,7 +32,6 @@ import java.math.BigDecimal;
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final WalletService walletService;
     private final LoyaltyProfileRepository loyaltyProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
@@ -46,7 +43,6 @@ public class AuthService {
 
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
-        // Validation Checks
         if (request.getFullName() == null || request.getFullName().trim().isEmpty()) {
             throw new AppException("Full name is required", HttpStatus.BAD_REQUEST);
         }
@@ -60,17 +56,14 @@ public class AuthService {
             throw new AppException("Password is required", HttpStatus.BAD_REQUEST);
         }
 
-        // Email uniqueness validation
         if (userRepository.existsByEmail(request.getEmail().trim())) {
             throw new AppException("Email is already registered", HttpStatus.BAD_REQUEST);
         }
 
-        // Phone number uniqueness validation
         if (userRepository.existsByPhoneNumber(request.getPhoneNumber().trim())) {
             throw new AppException("Phone number is already registered", HttpStatus.BAD_REQUEST);
         }
 
-        // Create and save User
         User user = User.builder()
                 .fullName(request.getFullName().trim())
                 .phoneNumber(request.getPhoneNumber().trim())
@@ -82,10 +75,7 @@ public class AuthService {
 
         user = userRepository.save(user);
 
-        // Create and save Wallet
-        walletService.createWallet(user);
 
-        // Create and save Loyalty Profile
         LoyaltyProfile loyaltyProfile = LoyaltyProfile.builder()
                 .user(user)
                 .totalPoints(0)
@@ -138,11 +128,8 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail().trim())
                 .orElseThrow(() -> new AppException("Email is not registered", HttpStatus.NOT_FOUND));
 
-        // Delete existing tokens for this user
         tokenRepository.deleteByUser(user);
 
-        // Generate token
-        String token = UUID.randomUUID().toString();
         PasswordResetToken resetToken = PasswordResetToken.builder()
                 .token(token)
                 .user(user)
@@ -151,9 +138,6 @@ public class AuthService {
 
         tokenRepository.save(resetToken);
 
-        // Send email
-        String resetLink = frontendUrl + "/reset-password?token=" + token;
-        emailService.sendResetPasswordEmail(user.getEmail(), resetLink);
     }
 
     @Transactional
@@ -177,7 +161,6 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
 
-        // Clean up token
         tokenRepository.delete(resetToken);
     }
 }

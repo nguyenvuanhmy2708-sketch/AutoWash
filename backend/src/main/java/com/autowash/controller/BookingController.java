@@ -28,28 +28,10 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.getBookingById(id));
     }
 
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<Booking>> getBookingsByUserId(@PathVariable Long userId) {
-        return ResponseEntity.ok(bookingService.getBookingsByUserId(userId));
     }
 
     @PostMapping
-    public ResponseEntity<Booking> createBooking(@RequestBody BookingRequest request) {
         Booking booking = bookingService.createBooking(
-                request.getUserId(),
-                request.getPackageId(),
-                request.getSlotId(),
-                request.getBookingDate(),
-                request.getVehicleSize()
-        );
-        return new ResponseEntity<>(booking, HttpStatus.CREATED);
-    }
-
-    @PostMapping("/walk-in")
-    public ResponseEntity<Booking> createWalkInBooking(@RequestBody WalkInBookingRequest request) {
-        Booking booking = bookingService.createWalkInBooking(
-                request.getPhoneNumber(),
-                request.getFullName(),
                 request.getPackageId(),
                 request.getSlotId(),
                 request.getBookingDate(),
@@ -65,17 +47,6 @@ public class BookingController {
 
     @Data
     public static class BookingRequest {
-        private Long userId;
-        private Long packageId;
-        private Long slotId;
-        private LocalDate bookingDate;
-        private String vehicleSize;
-    }
-
-    @Data
-    public static class WalkInBookingRequest {
-        private String phoneNumber;
-        private String fullName;
         private Long packageId;
         private Long slotId;
         private LocalDate bookingDate;
@@ -83,19 +54,10 @@ public class BookingController {
     }
 
     @PutMapping("/cancel")
-    public ResponseEntity<java.util.Map<String, String>> cancelBooking(
-            @RequestParam Long userId,
-            @RequestParam Long slotId,
-            @RequestParam Long packageId) {
 
-        // Gọi xuống service xử lý logic hủy và lưu DB
-        bookingService.cancelBookingByUserSlotAndPackage(userId, slotId, packageId);
 
-        // Tạo chuỗi JSON thông báo thành công gọn nhẹ để trả về, tránh trả nguyên Entity bị đơ LAZY
-        java.util.Map<String, String> response = new java.util.HashMap<>();
         response.put("message", "Hủy đơn đặt lịch thành công!");
 
         return ResponseEntity.ok(response);
     }
-
 }

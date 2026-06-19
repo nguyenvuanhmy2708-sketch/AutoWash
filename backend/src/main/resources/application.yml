@@ -5,7 +5,6 @@ spring:
   datasource:
     url: jdbc:sqlserver://localhost:1433;databaseName=AutoWash;encrypt=true;trustServerCertificate=true
     username: sa
-    password: 12345
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
   
   jpa:
@@ -54,11 +53,4 @@ logging:
 
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
-
-vnpay:
-  tmn-code: ${VNP_TMN_CODE:2QX2Z0D4}
-  hash-secret: ${VNP_HASH_SECRET:9M8K23N5B7V1C3X4Z5M6K7J8H9G0F1D2}
-  pay-url: ${VNP_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-  return-url: ${VNP_RETURN_URL:http://localhost:8080/api/payments/vnpay-callback}
-
 
