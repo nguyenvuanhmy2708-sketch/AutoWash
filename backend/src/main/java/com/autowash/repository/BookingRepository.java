@@ -8,7 +8,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,15 +16,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findByUserUserId(Long userId);
     List<Booking> findByBookingDate(LocalDate bookingDate);
 
-    // Bản của Mỹ dùng Collection trạng thái để loại trừ
-    long countByTimeSlotSlotIdAndBookingDateAndBookingStatusNotIn(Long slotId, LocalDate bookingDate, Collection<BookingStatus> statuses);
-    long countByUserUserIdAndBookingDateAndBookingStatusNotIn(Long userId, LocalDate bookingDate, Collection<BookingStatus> statuses);
-    boolean existsByUserUserIdAndTimeSlotSlotIdAndBookingDateAndBookingStatusNotIn(Long userId, Long slotId, LocalDate bookingDate, Collection<BookingStatus> statuses);
 
-    // Giữ nguyên hàm của bạn dùng đếm trùng slot
-    long countByUserUserIdAndTimeSlotSlotIdAndBookingDateAndBookingStatusNotIn(Long userId, Long slotId, LocalDate bookingDate, Collection<BookingStatus> statuses);
 
-    List<Booking> findByBookingStatusAndBookingDateLessThanEqual(BookingStatus status, LocalDate date);
 
     @Query("SELECT b FROM Booking b WHERE b.user.userId = :userId " +
             "AND b.timeSlot.slotId = :slotId " +

@@ -25,7 +25,6 @@ import com.autowash.dto.ResetPasswordRequest;
 import com.autowash.entity.PasswordResetToken;
 import com.autowash.repository.PasswordResetTokenRepository;
 import java.time.LocalDateTime;
-import java.security.SecureRandom;
 import java.math.BigDecimal;
 
 @Service
@@ -33,7 +32,6 @@ import java.math.BigDecimal;
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final WalletRepository walletRepository;
     private final LoyaltyProfileRepository loyaltyProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
@@ -77,11 +75,6 @@ public class AuthService {
 
         user = userRepository.save(user);
 
-        Wallet wallet = Wallet.builder()
-                .user(user)
-                .balance(BigDecimal.ZERO)
-                .build();
-        walletRepository.save(wallet);
 
         LoyaltyProfile loyaltyProfile = LoyaltyProfile.builder()
                 .user(user)
@@ -110,7 +103,6 @@ public class AuthService {
             throw new AppException("User account is inactive", HttpStatus.FORBIDDEN);
         }
 
-        // ĐÃ SỬA: Bỏ dấu ngoặc thừa ở cuối dòng này gây ra 3 lỗi compile
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new AppException("Invalid email or password", HttpStatus.UNAUTHORIZED);
         }
@@ -138,9 +130,6 @@ public class AuthService {
 
         tokenRepository.deleteByUser(user);
 
-        SecureRandom random = new SecureRandom();
-        int code = 100000 + random.nextInt(900000);
-        String token = String.valueOf(code);
         PasswordResetToken resetToken = PasswordResetToken.builder()
                 .token(token)
                 .user(user)
@@ -149,8 +138,6 @@ public class AuthService {
 
         tokenRepository.save(resetToken);
 
-        // ĐÃ SỬA: Đổi tên hàm sendResetPasswordCode thành sendResetPasswordEmail để khớp với file EmailService của bạn
-        emailService.sendResetPasswordEmail(user.getEmail(), token);
     }
 
     @Transactional

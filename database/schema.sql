@@ -1,7 +1,9 @@
 ﻿USE AutoWash;
 GO
 
-
+-- =========================================================================
+-- 🟢 BƯỚC 1: TUYỆT CHIÊU TỰ ĐỘNG TÌM VÀ XÓA TẤT CẢ KHÓA NGOẠI (KHÔNG CẦN BIẾT TÊN)
+-- =========================================================================
 DECLARE @Sql NVARCHAR(MAX) = N'';
 
 SELECT @Sql += 'ALTER TABLE [' + OBJECT_SCHEMA_NAME(parent_object_id) + '].[' + OBJECT_NAME(parent_object_id) + '] DROP CONSTRAINT [' + name + '];' + CHAR(13)
@@ -13,6 +15,9 @@ BEGIN
 END
 GO
 
+-- =========================================================================
+-- 🟢 BƯỚC 2: DROP TOÀN BỘ CÁC BẢNG CŨ (BÂY GIỜ CHẮC CHẮN TRỐNG KHÓA NGOẠI)
+-- =========================================================================
 DROP TABLE IF EXISTS Notifications;
 DROP TABLE IF EXISTS PasswordResetTokens;
 DROP TABLE IF EXISTS LoyaltyProfiles;
@@ -25,7 +30,9 @@ DROP TABLE IF EXISTS ServicePackages;
 DROP TABLE IF EXISTS Users;
 GO
 
-
+-- =========================================================================
+-- 🟢 BƯỚC 3: TẠO MỚI TOÀN BỘ CẤU TRÚC DATABASE SẠCH SẼ
+-- =========================================================================
 CREATE TABLE Users (
     user_id BIGINT IDENTITY(1,1) PRIMARY KEY,
     full_name NVARCHAR(100) NOT NULL,
@@ -165,7 +172,6 @@ CREATE TABLE Notifications (
 );
 GO
 
-
+-- ❌ ĐÃ GỠ BỎ HOÀN TOÀN TRIGGER CŨ ĐỂ NHƯỜNG LUỒNG XỬ LÝ AN TOÀN CHO CODE JAVA
 DROP TRIGGER IF EXISTS trg_CalculateBookingDiscount;
 GO
-
